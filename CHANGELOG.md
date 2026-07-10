@@ -41,6 +41,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Corrective action**: `lps_mark_complete` accepts `corrective_action`,
   closing the PDCA loop on variances.
 
+### Added — multi-platform loading
+
+- `load_project` now routes Primavera P6 (`.xer`, `.pmxml`), Synchro
+  Scheduler (`.sp`), Asta Powerproject (`.pp`) and `.mpx` to the mpxj
+  universal reader (requires the `[mpp]` extra). Previously these extensions
+  were rejected even though the loader could already read them.
+- `.xml` files that are not MSPDI (e.g. P6 PMXML exports) are automatically
+  retried through the universal reader instead of silently loading as an
+  empty project.
+- README: supported-formats table (EN/PT-BR). All 49 tools, including the
+  AWP/LPS layers, work identically regardless of the source format.
+
 ### Changed
 
 - **Renamed project `project-mcp` → `msproject-lean-mcp`** to reflect what

@@ -70,6 +70,37 @@ def test_load_project_unsupported_extension(tmp_path: Path) -> None:
     assert "Unsupported file extension" in result["error"]
 
 
+@pytest.mark.parametrize("suffix", [".xer", ".sp", ".pp", ".pmxml", ".mpx"])
+def test_load_project_routes_universal_formats(tmp_path: Path, suffix: str) -> None:
+    """P6/Synchro/Asta extensions must reach the universal loader, not be
+    rejected as unsupported. Without the `mpp` extra installed the loader
+    returns the install hint; with it, mpxj fails on the bogus content."""
+    bogus = tmp_path / f"schedule{suffix}"
+    bogus.write_text("bogus content")
+    result = _parse(server.load_project(str(bogus)))
+    assert "error" in result
+    assert "Unsupported file extension" not in result["error"]
+    assert "'mpp' extra" in result["error"] or "could not read" in result["error"]
+
+
+def test_load_project_non_mspdi_xml_falls_back(tmp_path: Path) -> None:
+    """A .xml that is not MSPDI (e.g. P6 PMXML) must not silently load as an
+    empty project — it retries via the universal reader and surfaces a clear
+    error when that also fails."""
+    pmxml = tmp_path / "p6-export.xml"
+    pmxml.write_text(
+        '<?xml version="1.0"?>'
+        '<APIBusinessObjects xmlns="http://xmlns.oracle.com/Primavera/P6">'
+        "<Project><Id>P6-DEMO</Id></Project></APIBusinessObjects>"
+    )
+    result = _parse(server.load_project(str(pmxml)))
+    if "error" in result:
+        assert "MSPDI" in result["error"]
+    else:
+        # mpp extra + Java present: mpxj actually parsed it
+        assert result["loaded"] is True
+
+
 # ---------------------------------------------------------------- project_info
 
 

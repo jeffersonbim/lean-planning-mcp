@@ -35,13 +35,44 @@ def _serialize(obj: Any) -> str:
     return json.dumps(obj, indent=2, default=str, ensure_ascii=False)
 
 
+# Extensions routed to mpxj's UniversalProjectReader (requires the `mpp` extra):
+# .mpp/.mpx  Microsoft Project native
+# .xer       Primavera P6 export
+# .pmxml     Primavera P6 XML (explicit extension)
+# .sp        Synchro Scheduler
+# .pp        Asta Powerproject
+_UNIVERSAL_SUFFIXES = (".mpp", ".mpx", ".xer", ".pmxml", ".sp", ".pp")
+
+_MPP_EXTRA_ERROR = (
+    "This format requires the optional 'mpp' extra (mpxj + Java). "
+    "Install with: uv pip install 'msproject-lean-mcp[mpp]' — or export the "
+    "schedule as Microsoft Project MSPDI XML and load the .xml instead."
+)
+
+
+def _load_universal(file_path: Path) -> mspdi.Project | dict:
+    """Load any mpxj-supported format. Returns a Project or an error dict."""
+    try:
+        from msproject_lean_mcp import mpp_loader  # type: ignore
+    except ImportError:
+        return {"error": _MPP_EXTRA_ERROR}
+    try:
+        return mpp_loader.parse_file(file_path)
+    except Exception as exc:  # mpxj/JPype raise a wide range here
+        return {"error": f"mpxj could not read '{file_path.name}': {exc}"}
+
+
 @mcp.tool()
 def load_project(path: str) -> str:
-    """Load a Microsoft Project file into memory.
+    """Load a project schedule into memory.
 
-    Currently supports MSPDI XML format (.xml), exported from Microsoft Project
-    via File → Save As → Save as Type → XML Format. Support for native .mpp is
-    available when the optional `mpxj` extra is installed (requires Java).
+    Natively supported (no extra dependencies): MSPDI XML (.xml) exported from
+    Microsoft Project via File → Save As → XML Format.
+
+    With the optional `mpp` extra (mpxj + Java): Microsoft Project native
+    (.mpp/.mpx), Primavera P6 (.xer, .pmxml), Synchro Scheduler (.sp) and
+    Asta Powerproject (.pp). A .xml file that is not MSPDI (e.g. P6 PMXML)
+    is automatically retried through the universal reader.
 
     Args:
         path: Absolute path to the project file.
@@ -53,22 +84,34 @@ def load_project(path: str) -> str:
     if not file_path.exists():
         return _serialize({"error": f"File not found: {path}"})
     suffix = file_path.suffix.lower()
-    if suffix in (".xml",):
-        project = mspdi.parse_file(file_path)
-    elif suffix == ".mpp":
+    if suffix == ".xml":
         try:
-            from msproject_lean_mcp import mpp_loader  # type: ignore
-        except ImportError:
-            return _serialize({
-                "error": ".mpp requires the optional 'mpp' extra. "
-                         "Install with: uv pip install 'msproject-lean-mcp[mpp]' "
-                         "or export the file as XML from Microsoft Project."
-            })
-        project = mpp_loader.parse_file(file_path)
+            project = mspdi.parse_file(file_path)
+        except Exception:
+            project = None
+        if project is None or not project.tasks:
+            # Not MSPDI (or empty) — could be P6 PMXML or another XML schema.
+            fallback = _load_universal(file_path)
+            if isinstance(fallback, mspdi.Project) and fallback.tasks:
+                project = fallback
+            elif project is None:
+                error = fallback["error"] if isinstance(fallback, dict) else "unknown"
+                return _serialize({
+                    "error": f"Could not parse '{file_path.name}' as MSPDI XML, "
+                             f"and the universal reader fallback failed: {error}",
+                })
+    elif suffix in _UNIVERSAL_SUFFIXES:
+        result = _load_universal(file_path)
+        if isinstance(result, dict):
+            return _serialize(result)
+        project = result
     else:
         return _serialize({
-            "error": f"Unsupported file extension: {suffix}. Use .xml (MSPDI) or .mpp.",
-            "hint": "From Microsoft Project: File → Save As → Save as Type → XML Format (*.xml)",
+            "error": f"Unsupported file extension: {suffix}. "
+                     f"Use .xml (MSPDI) or one of: {', '.join(_UNIVERSAL_SUFFIXES)}.",
+            "hint": "From Microsoft Project: File → Save As → XML Format (*.xml). "
+                    "From Primavera P6: export XER or P6 XML. "
+                    "From Synchro: export XER or MS Project XML.",
         })
     _state["project"] = project
     return _serialize({

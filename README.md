@@ -6,12 +6,13 @@
 
 > 🇺🇸 English · 🇧🇷 [Versão em português](README.pt-BR.md)
 
-Model Context Protocol (MCP) server that exposes Microsoft Project files
-to LLM clients like Claude Desktop and Claude Code. Reads schedules, resources,
-dependencies, critical-path data, and baseline variance — and adds **AWP**
-(Advanced Work Packaging, CII) and **LPS** (Last Planner System, Lean) layers
-for work-package planning, constraints, weekly commitments and PPC tracking.
-All local, no cloud calls, no Microsoft Project license required.
+Model Context Protocol (MCP) server that exposes project schedules —
+**Microsoft Project, Primavera P6 and Synchro Scheduler** — to LLM clients
+like Claude Desktop and Claude Code. Reads schedules, resources, dependencies,
+critical-path data, and baseline variance — and adds **AWP** (Advanced Work
+Packaging, CII) and **LPS** (Last Planner System, Lean) layers for
+work-package planning, constraints, weekly commitments and PPC tracking.
+All local, no cloud calls, no scheduling-tool license required.
 
 ## Why
 
@@ -33,8 +34,28 @@ Microsoft Project itself.
 - Python 3.11+
 - An MCP-compatible client (Claude Desktop, Claude Code, etc.)
 - For `.xml` (MSPDI): no extra dependencies
-- For `.mpp` (native Microsoft Project): the optional `[mpp]` extra (requires
-  a JVM via the `mpxj` package)
+- For every other format: the optional `[mpp]` extra (requires a JVM via the
+  `mpxj` package)
+
+## Supported formats
+
+| Format | Extension | Requires `[mpp]` extra |
+|---|---|---|
+| Microsoft Project MSPDI XML | `.xml` | No |
+| Microsoft Project native | `.mpp`, `.mpx` | Yes |
+| Primavera P6 export | `.xer` | Yes |
+| Primavera P6 XML (PMXML) | `.pmxml`, `.xml`* | Yes |
+| Synchro Scheduler | `.sp` | Yes |
+| Asta Powerproject | `.pp` | Yes |
+
+\* A `.xml` file that is not MSPDI is automatically retried through the
+universal reader (mpxj), so P6 XML exports saved as `.xml` also load.
+
+Synchro note: mpxj reads Synchro Scheduler `.sp` files up to the versions it
+supports; for recent Synchro 4D Pro projects, exporting XER or MS Project XML
+from Synchro is the most reliable path. Once loaded, **all 49 tools —
+including the AWP and LPS layers — work identically regardless of source
+format**, since they operate on task UIDs.
 
 ## Installation
 
@@ -87,7 +108,7 @@ Restart Claude Desktop. The 49 tools become available in any conversation
 
 | Tool | Purpose |
 |---|---|
-| `load_project` | Load an MSPDI `.xml` or `.mpp` file into memory |
+| `load_project` | Load a schedule into memory — MSPDI `.xml`, `.mpp`, P6 `.xer`/`.pmxml`, Synchro `.sp`, Asta `.pp` |
 | `open_in_ms_project` | Open the loaded (or a given) project file in Microsoft Project via the OS default association |
 | `project_info` | Title, author, schedule window, currency, aggregate counts |
 | `list_tasks` | Filter tasks by type, criticality, name substring, top N |

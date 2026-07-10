@@ -6,12 +6,13 @@
 
 > 🇧🇷 Versão em português · 🇺🇸 [English version](README.md)
 
-Servidor MCP (Model Context Protocol) que expõe arquivos do Microsoft Project
-para clientes LLM como Claude Desktop e Claude Code. Lê cronogramas, recursos,
-dependências, caminho crítico e variação de baseline — e adiciona camadas
-de **AWP** (Advanced Work Packaging, CII) e **LPS** (Last Planner System, Lean)
-para gerenciar pacotes de trabalho, restrições, compromissos semanais e PPC.
-Tudo local, sem chamadas à nuvem e sem necessidade de licença do Microsoft Project.
+Servidor MCP (Model Context Protocol) que expõe cronogramas — **Microsoft
+Project, Primavera P6 e Synchro Scheduler** — para clientes LLM como Claude
+Desktop e Claude Code. Lê cronogramas, recursos, dependências, caminho crítico
+e variação de baseline — e adiciona camadas de **AWP** (Advanced Work
+Packaging, CII) e **LPS** (Last Planner System, Lean) para gerenciar pacotes
+de trabalho, restrições, compromissos semanais e PPC. Tudo local, sem chamadas
+à nuvem e sem necessidade de licença de ferramenta de planejamento.
 
 ## Por que existe
 
@@ -33,8 +34,28 @@ no próprio Microsoft Project.
 - Python 3.11+
 - Um cliente MCP compatível (Claude Desktop, Claude Code, etc.)
 - Para `.xml` (MSPDI): nenhuma dependência extra
-- Para `.mpp` (formato nativo do Microsoft Project): a dependência opcional
-  `[mpp]` (requer JVM via pacote `mpxj`)
+- Para todos os outros formatos: a dependência opcional `[mpp]` (requer JVM
+  via pacote `mpxj`)
+
+## Formatos suportados
+
+| Formato | Extensão | Requer extra `[mpp]` |
+|---|---|---|
+| Microsoft Project MSPDI XML | `.xml` | Não |
+| Microsoft Project nativo | `.mpp`, `.mpx` | Sim |
+| Primavera P6 export | `.xer` | Sim |
+| Primavera P6 XML (PMXML) | `.pmxml`, `.xml`* | Sim |
+| Synchro Scheduler | `.sp` | Sim |
+| Asta Powerproject | `.pp` | Sim |
+
+\* Um `.xml` que não é MSPDI é automaticamente reprocessado pelo leitor
+universal (mpxj), então exports P6 XML salvos como `.xml` também carregam.
+
+Nota Synchro: o mpxj lê arquivos `.sp` do Synchro Scheduler até as versões
+que suporta; para projetos recentes do Synchro 4D Pro, exportar XER ou MS
+Project XML de dentro do Synchro é o caminho mais confiável. Depois de
+carregado, **todas as 49 tools — incluindo as camadas AWP e LPS — funcionam
+igual independente do formato de origem**, pois operam sobre task UIDs.
 
 ## Instalação
 
@@ -87,7 +108,7 @@ Reinicie o Claude Desktop. As 49 tools ficam disponíveis em qualquer conversa
 
 | Tool | Finalidade |
 |---|---|
-| `load_project` | Carrega um `.xml` MSPDI ou `.mpp` na memória |
+| `load_project` | Carrega cronograma na memória — MSPDI `.xml`, `.mpp`, P6 `.xer`/`.pmxml`, Synchro `.sp`, Asta `.pp` |
 | `open_in_ms_project` | Abre o projeto carregado (ou um caminho informado) no Microsoft Project via associação padrão do SO |
 | `project_info` | Título, autor, janela do cronograma, moeda, contagens agregadas |
 | `list_tasks` | Filtra tarefas por tipo, criticidade, substring no nome, top N |
